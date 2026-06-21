@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Partidas - STTRANS</title>
+    <style>
+        :root { --verde-sttrans: #009639; --amarelo-destaque: #FFD700; --branco: #FFFFFF; }
+        body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; overflow: hidden; height: 100vh; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; background-color: rgba(0,0,0,0.2); border-bottom: 3px solid var(--amarelo-destaque); }
+        h1 { font-size: 1.5vw; text-transform: uppercase; margin: 0; }
+        #relogio { font-size: 2vw; font-weight: bold; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; height: 85vh; }
+        #destaque { display: grid; grid-template-rows: auto 1fr; gap: 15px; }
+        #box-partida { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; }
+        #box-partida h2 { color: var(--amarelo-destaque); font-size: 1.5vw; margin: 0 0 10px 0; }
+        #info-destaque { font-size: 2.5vw; font-weight: bold; line-height: 1.1; }
+        #box-informativo { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 2vw; font-weight: bold; color: var(--amarelo-destaque); transition: opacity 0.5s; }
+        #lista-proximos { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 1.3vw; }
+        th { text-align: left; color: var(--amarelo-destaque); padding: 10px; border-bottom: 2px solid var(--branco); }
+        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Terminal de Transporte Alternativo</h1>
+        <div id="relogio">00:00:00</div>
+    </header>
+
+    <main class="container">
+        <section id="destaque">
+            <div id="box-partida">
+                <h2>Próxima Partida</h2>
+                <div id="info-destaque">Aguardando dados...</div>
+            </div>
+            <div id="box-informativo">Bem-vindo</div>
+        </section>
+
+        <section id="lista-proximos">
+            <table>
+                <thead>
+                    <tr><th>Chegada</th><th>Saída</th><th>Motorista</th><th>Destino</th><th>Plataforma</th></tr>
+                </thead>
+                <tbody id="corpo-tabela"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
+        const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
+
+        document.addEventListener("DOMContentLoaded", function() {
+            setInterval(() => document.getElementById('relogio').innerText = new Date().toLocaleTimeString(), 1000);
+
+            async function carregarTudo() {
+                try {
+                    // --- 1. CARREGAR DADOS ---
+                    // Usamos crases (`) para garantir que o link seja montado perfeitamente
+                    const resp = await fetch(`${linkDados}&t=${Date.now()}`);
+                    const text = await resp.text();
+                    const linhas = text.split('\n').filter(l => l.trim() !== "");
+                    
+                    const agora = new Date();
+                    const minutosAtuais = agora.getHours() * 60 + agora.getMinutes();
+                    
+                    const tbody = document.getElementById('corpo-tabela');
+                    const infoDestaque = document.getElementById('info-destaque');
+                    tbody.innerHTML = '';
+                    
+                    let achouProximo = false;
+
+                    for (let i = 1; i < linhas.length; i++) {
+                        const cols = linhas[i].split(',');
+                        if (cols.length < 5) continue;
+
+                        const [h, m] = cols[1].trim().split(':'); // Coluna 1 é SAÍDA
+                        const minutosSaida = parseInt(h) * 60 + parseInt(m);
+
+                        if (minutosSaida >= minutosAtuais) {
+                            if (!achouProximo) {
+                                infoDestaque.innerHTML = `${cols[2]} - ${cols[1]}<br><span style="font-size: 1.8vw;">Motorista: ${cols[4]}, Plat: ${cols[3]}</span>`;
+                                achouProximo = true;
+                            }
+                            tbody.innerHTML += `<tr><td>${cols[0]}</td><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td><td>${cols[3]}</td></tr>`;
+                        }
+                    }
+
+                    if (!achouProximo) {
+                        infoDestaque.innerHTML = "Não há mais partidas hoje.";
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Fim das operações.</td></tr>';
+                    }
+
+                    // --- 2. CONFIG ---
+                    const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
+                    const textCfg = await respCfg.text();
+                    const linhasCfg = textCfg.split('\n').filter(l => l.trim() !== "");
+                    
+                    if (linhasCfg.length > 1) {
+                        let msgIndex = 0;
+                        function rodarMensagens() {
+                            const cfg = linhasCfg[(msgIndex % (linhasCfg.length - 1)) + 1].split(',');
+                            const el = document.getElementById('box-informativo');
+                            if(el) {
+                                el.style.opacity = 0;
+                                setTimeout(() => {
+                                    el.innerText = cfg[0];
+                                    el.style.opacity = 1;
+                                    msgIndex++;
+                                    setTimeout(rodarMensagens, parseInt(cfg[1]) || 5000);
+                                }, 500);
+                            }
+                        }
+                        rodarMensagens();
+                    }
+                } catch(e) { console.error("Erro no carregamento:", e); }
+            }
+
+            // ... (dentro do document.addEventListener, após a função carregarTudo) ...
+
+            // Função que sincroniza com o relógio do sistema
+            function iniciarSincronizado() {
+                // Executa a primeira vez imediatamente
+                carregarTudo();
+                
+                // Calcula quantos milissegundos faltam para o próximo marco de 30 segundos (00 ou 30)
+                const agora = new Date();
+                const msAtual = agora.getSeconds() * 1000 + agora.getMilliseconds();
+                const resto = msAtual % 30000;
+                const delay = 30000 - resto;
+
+                // Espera o tempo que falta para o próximo 00 ou 30 segundos
+                setTimeout(() => {
+                    carregarTudo();
+                    // Agora entra no ciclo fixo de 30 segundos
+                    setInterval(carregarTudo, 30000);
+                }, delay);
+            }
+
+            // Inicia o processo sincronizado
+            iniciarSincronizado();
+        });
+    </script>
+</body>
+</html>
