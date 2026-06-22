@@ -11,7 +11,7 @@
         #relogio { font-size: 2vw; font-weight: bold; }
         .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; height: 85vh; }
         #destaque { display: grid; grid-template-rows: auto 1fr; gap: 15px; }
-        #box-partida { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; }
+        #box-partida { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; transition: opacity 0.5s; }
         #box-partida h2 { color: var(--amarelo-destaque); font-size: 1.5vw; margin: 0 0 10px 0; }
         #info-destaque { font-size: 2.5vw; font-weight: bold; line-height: 1.1; }
         #box-informativo { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 2vw; font-weight: bold; color: var(--amarelo-destaque); transition: opacity 0.5s; }
@@ -32,7 +32,7 @@
         <section id="destaque">
             <div id="box-partida">
                 <h2>Próxima Partida</h2>
-                <div id="info-destaque">Aguardando dados...</div>
+                <div id="info-destaque">Carregando...</div>
             </div>
             <div id="box-informativo">Bem-vindo</div>
         </section>
@@ -51,13 +51,15 @@
         const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
         const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
 
+        let carouselIndex = 0;
+        let grupoDestaque = [];
+
         document.addEventListener("DOMContentLoaded", function() {
             setInterval(() => document.getElementById('relogio').innerText = new Date().toLocaleTimeString(), 1000);
 
             async function carregarTudo() {
                 try {
-                    // --- 1. CARREGAR DADOS ---
-                    // Usamos crases (`) para garantir que o link seja montado perfeitamente
+                    // 1. CARREGAR DADOS
                     const resp = await fetch(`${linkDados}&t=${Date.now()}`);
                     const text = await resp.text();
                     const linhas = text.split('\n').filter(l => l.trim() !== "");
@@ -65,38 +67,40 @@
                     const agora = new Date();
                     const minutosAtuais = agora.getHours() * 60 + agora.getMinutes();
                     
-                    const tbody = document.getElementById('corpo-tabela');
-                    const infoDestaque = document.getElementById('info-destaque');
-                    tbody.innerHTML = '';
-                    
-                    let achouProximo = false;
-
+                    let listaFutura = [];
                     for (let i = 1; i < linhas.length; i++) {
                         const cols = linhas[i].split(',');
                         if (cols.length < 5) continue;
-
-                        const [h, m] = cols[1].trim().split(':'); // Coluna 1 é SAÍDA
+                        const [h, m] = cols[1].trim().split(':'); // Coluna 1 = Saída
                         const minutosSaida = parseInt(h) * 60 + parseInt(m);
-
+                        
                         if (minutosSaida >= minutosAtuais) {
-                            if (!achouProximo) {
-                                infoDestaque.innerHTML = `${cols[2]} - ${cols[1]}<br><span style="font-size: 1.8vw;">Motorista: ${cols[4]}, Plataforma: ${cols[3]}</span>`;
-                                achouProximo = true;
-                            }
-                            tbody.innerHTML += `<tr><td>${cols[0]}</td><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td><td>${cols[3]}</td></tr>`;
+                            listaFutura.push({
+                                chegada: cols[0], saida: cols[1], destino: cols[2], plataforma: cols[3], motorista: cols[4], min: minutosSaida
+                            });
                         }
                     }
 
-                    if (!achouProximo) {
-                        infoDestaque.innerHTML = "Não há mais partidas hoje.";
-                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Fim das operações.</td></tr>';
+                    // --- ATUALIZAR TABELA (LIMITADA A 6) ---
+                    const tbody = document.getElementById('corpo-tabela');
+                    tbody.innerHTML = '';
+                    listaFutura.slice(0, 6).forEach(v => {
+                        tbody.innerHTML += `<tr><td>${v.chegada}</td><td>${v.saida}</td><td>${v.motorista}</td><td>${v.destino}</td><td>${v.plataforma}</td></tr>`;
+                    });
+
+                    // --- ATUALIZAR DESTAQUE (CAROUSEL) ---
+                    if (listaFutura.length > 0) {
+                        const minTempo = listaFutura[0].min;
+                        grupoDestaque = listaFutura.filter(v => v.min === minTempo);
+                        // A lógica do carousel será tratada pelo setInterval abaixo
+                    } else {
+                        document.getElementById('info-destaque').innerHTML = "Não há mais partidas hoje.";
                     }
 
-                    // --- 2. CONFIG ---
+                    // 2. CARREGAR CONFIG (Mensagens)
                     const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
                     const textCfg = await respCfg.text();
                     const linhasCfg = textCfg.split('\n').filter(l => l.trim() !== "");
-                    
                     if (linhasCfg.length > 1) {
                         let msgIndex = 0;
                         function rodarMensagens() {
@@ -114,32 +118,26 @@
                         }
                         rodarMensagens();
                     }
-                } catch(e) { console.error("Erro no carregamento:", e); }
+                } catch(e) { console.error("Erro:", e); }
             }
 
-            // ... (dentro do document.addEventListener, após a função carregarTudo) ...
+            // Carousel do Destaque (roda a cada 4 segundos)
+            setInterval(() => {
+                if (grupoDestaque.length > 0) {
+                    const el = document.getElementById('box-partida');
+                    const info = document.getElementById('info-destaque');
+                    el.style.opacity = 0;
+                    setTimeout(() => {
+                        const v = grupoDestaque[carouselIndex % grupoDestaque.length];
+                        info.innerHTML = `${v.destino} - ${v.saida}<br><span style="font-size: 1.8vw;">Motorista: ${v.motorista}, Plat: ${v.plataforma}</span>`;
+                        el.style.opacity = 1;
+                        carouselIndex++;
+                    }, 500);
+                }
+            }, 4000);
 
-            // Função que sincroniza com o relógio do sistema
-            function iniciarSincronizado() {
-                // Executa a primeira vez imediatamente
-                carregarTudo();
-                
-                // Calcula quantos milissegundos faltam para o próximo marco de 30 segundos (00 ou 30)
-                const agora = new Date();
-                const msAtual = agora.getSeconds() * 1000 + agora.getMilliseconds();
-                const resto = msAtual % 30000;
-                const delay = 30000 - resto;
-
-                // Espera o tempo que falta para o próximo 00 ou 30 segundos
-                setTimeout(() => {
-                    carregarTudo();
-                    // Agora entra no ciclo fixo de 30 segundos
-                    setInterval(carregarTudo, 30000);
-                }, delay);
-            }
-
-            // Inicia o processo sincronizado
-            iniciarSincronizado();
+            carregarTudo();
+            setInterval(carregarTudo, 30000);
         });
     </script>
 </body>
