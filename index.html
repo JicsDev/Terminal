@@ -5,33 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Partidas - STTRANS</title>
     <style>
+        * { box-sizing: border-box; } /* Isso evita que padding aumente o tamanho da tela */
         :root { --verde-sttrans: #009639; --amarelo-destaque: #FFD700; --branco: #FFFFFF; }
-        body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; }
         
-        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; background-color: rgba(0,0,0,0.2); border-bottom: 3px solid var(--amarelo-destaque); }
-        .logo { height: 60px; }
-        .relogio-container { display: flex; flex-direction: column; align-items: flex-end; }
-        #relogio { font-size: 2vw; font-weight: bold; }
-        #data-atual { font-size: 1vw; }
+        body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
         
-        /* Layout Desktop (2 colunas) */
-        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 3px solid var(--amarelo-destaque); background-color: rgba(0,0,0,0.2); }
+        .logo { height: 40px; }
         
-        #box-partida { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; }
-        #box-informativo { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 2vw; font-weight: bold; color: var(--amarelo-destaque); transition: opacity 0.5s; }
-        #lista-proximos { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; }
+        /* Container Principal */
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
         
-        table { width: 100%; border-collapse: collapse; }
-        th { color: var(--amarelo-destaque); padding: 10px; border-bottom: 2px solid var(--branco); }
-        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        /* Ajuste de Caixas */
+        #box-partida, #box-informativo, #lista-proximos { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; }
+        
+        /* Ajuste de Texto */
+        h1 { font-size: 1.2rem; margin: 0; }
+        #relogio { font-size: 1.2rem; font-weight: bold; }
+        #info-destaque { font-size: 1.5rem; font-weight: bold; }
+        
+        /* Tabela */
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { color: var(--amarelo-destaque); text-align: left; padding: 5px; }
+        td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); }
 
-        /* LAYOUT CELULAR (Empilhado) */
+        /* MODO CELULAR (Telas menores que 768px) */
         @media (max-width: 768px) {
-            .container { grid-template-columns: 1fr; } /* Tudo vira uma coluna só */
-            .relogio-container { display: none; } /* Esconde o relógio no celular */
-            h1 { font-size: 5vw; }
-            #box-informativo { font-size: 5vw; min-height: 80px; }
-            #info-destaque { font-size: 6vw; }
+            .container { grid-template-columns: 1fr; } /* Empilha tudo */
+            .relogio-container { display: none; } /* Esconde relógio no celular */
+            h1 { font-size: 0.9rem; }
         }
     </style>
 </head>
@@ -39,10 +41,9 @@
 
     <header>
         <img src="logo.png" alt="Logo" class="logo"> 
-        <h1>Terminal de Transporte Alternativo</h1>
+        <h1>STTRANS</h1>
         <div class="relogio-container">
             <div id="relogio">00:00:00</div>
-            <div id="data-atual">...</div>
         </div>
     </header>
 
@@ -59,11 +60,47 @@
             </table>
         </div>
 
-        <div id="box-informativo">Carregando...</div>
+        <div id="box-informativo">Carregando mensagens...</div>
     </main>
 
     <script>
-        // ... (seu script aqui) ...
+        const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
+        
+        // --- FUNÇÃO DE RELÓGIO ---
+        function atualizarRelogio() {
+            document.getElementById('relogio').innerText = new Date().toLocaleTimeString();
+        }
+        setInterval(atualizarRelogio, 1000);
+
+        // --- FUNÇÃO DE DADOS ---
+        async function carregarDados() {
+            try {
+                const response = await fetch(`${linkDados}&t=${Date.now()}`);
+                if (!response.ok) throw new Error('Falha na rede');
+                const text = await response.text();
+                const linhas = text.split('\n').filter(l => l.trim() !== "");
+                
+                const tbody = document.getElementById('corpo-tabela');
+                tbody.innerHTML = '';
+                
+                // Exemplo simples de preenchimento (ajuste conforme seu formato real)
+                for (let i = 1; i < Math.min(linhas.length, 9); i++) {
+                    const cols = linhas[i].split(',');
+                    tbody.innerHTML += `<tr><td>${cols[0]}</td><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td><td>${cols[3]}</td></tr>`;
+                }
+                document.getElementById('info-destaque').innerText = "Dados carregados com sucesso!";
+            } catch (err) {
+                console.error("Erro nos dados:", err);
+                document.getElementById('info-destaque').innerText = "Erro ao carregar dados.";
+            }
+        }
+
+        // Iniciar
+        document.addEventListener('DOMContentLoaded', () => {
+            atualizarRelogio();
+            carregarDados();
+            setInterval(carregarDados, 30000);
+        });
     </script>
 </body>
 </html>
