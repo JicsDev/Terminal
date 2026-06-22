@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Partidas - STTRANS</title>
+    <style>
+        :root { --verde-sttrans: #009639; --amarelo-destaque: #FFD700; --branco: #FFFFFF; }
+        body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; overflow: hidden; height: 100vh; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; background-color: rgba(0,0,0,0.2); border-bottom: 3px solid var(--amarelo-destaque); }
+        .logo { height: 60px; }
+        .relogio-container { display: flex; flex-direction: column; align-items: flex-end; }
+        #relogio { font-size: 2vw; font-weight: bold; }
+        #data-atual { font-size: 1vw; }
+        h1 { font-size: 1.5vw; text-transform: uppercase; margin: 0; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; height: 85vh; }
+        #destaque { display: grid; grid-template-rows: auto 1fr; gap: 15px; }
+        #box-partida { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; transition: opacity 0.5s; }
+        #box-partida h2 { color: var(--amarelo-destaque); font-size: 1.5vw; margin: 0 0 10px 0; }
+        #info-destaque { font-size: 2.5vw; font-weight: bold; line-height: 1.1; }
+        #box-informativo { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 2vw; font-weight: bold; color: var(--amarelo-destaque); transition: opacity 0.5s; }
+        #lista-proximos { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 1.3vw; }
+        th { text-align: left; color: var(--amarelo-destaque); padding: 10px; border-bottom: 2px solid var(--branco); }
+        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+        /* Ajustes para Celulares (Telas estreitas) */
+@media (max-width: 600px) {
+    body { overflow-y: auto; height: auto; } /* Permite rolar a tela */
+    
+    .container {
+        grid-template-columns: 1fr !important; 
+        height: auto !important; /* Libera a altura fixa */
+        gap: 10px !important;
+        padding: 5px !important;
+    }
+    
+    header { padding: 5px !important; }
+    h1 { font-size: 3.5vw !important; }
+    .logo { height: 30px !important; }
+    
+    /* Ajusta o Destaque */
+    #destaque { grid-template-rows: auto auto; gap: 5px !important; }
+    #box-partida { padding: 10px !important; }
+    #info-destaque { font-size: 5vw !important; }
+    
+    /* Ajusta o Informativo */
+    #box-informativo { padding: 10px !important; font-size: 4vw !important; }
+    
+    /* Ajusta a Tabela */
+    #lista-proximos { padding: 10px !important; }
+    table { font-size: 3vw !important; }
+    td, th { padding: 4px !important; }
+    
+    .relogio-container { display: none; } /* Esconde o relógio no celular para ganhar espaço */
+}
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <img src="logo.jpg" alt="Logo" class="logo"> 
+        <h1>Terminal de Transporte Alternativo</h1>
+        <div class="relogio-container">
+            <div id="relogio">00:00:00</div>
+            <div id="data-atual">...</div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section id="destaque">
+            <div id="box-partida">
+                <h2>Próxima Partida</h2>
+                <div id="info-destaque">Carregando...</div>
+            </div>
+            <div id="box-informativo">Carregando mensagens...</div>
+        </section>
+
+        <section id="lista-proximos">
+            <table>
+                <thead>
+                    <tr><th>Chegada</th><th>Saída</th><th>Motorista</th><th>Destino</th><th>Plataforma</th></tr>
+                </thead>
+                <tbody id="corpo-tabela"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
+        const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
+
+        let grupoDestaque = [];
+        let carouselIndex = 0;
+        let listaMensagens = [];
+        let msgIndex = 0;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // 1. Relógio e Data (Fixo)
+            setInterval(() => {
+                const agora = new Date();
+                document.getElementById('relogio').innerText = agora.toLocaleTimeString();
+                document.getElementById('data-atual').innerText = agora.toLocaleDateString();
+            }, 1000);
+
+            // 2. Carregar Dados de Ônibus
+            async function carregarDados() {
+                try {
+                    const resp = await fetch(`${linkDados}&t=${Date.now()}`);
+                    const text = await resp.text();
+                    const linhas = text.split('\n').filter(l => l.trim() !== "");
+                    
+                    const agora = new Date();
+                    const minutosAtuais = agora.getHours() * 60 + agora.getMinutes();
+                    
+                    let listaFutura = [];
+                    for (let i = 1; i < linhas.length; i++) {
+                        const cols = linhas[i].split(',');
+                        if (cols.length < 5) continue;
+                        const [h, m] = cols[1].trim().split(':');
+                        const minutosSaida = parseInt(h) * 60 + parseInt(m);
+                        
+                        if (minutosSaida >= minutosAtuais) {
+                            listaFutura.push({ chegada: cols[0], saida: cols[1], destino: cols[2], plataforma: cols[3], motorista: cols[4], min: minutosSaida });
+                        }
+                    }
+
+                    // Tabela (Limite de 8)
+                    const tbody = document.getElementById('corpo-tabela');
+                    tbody.innerHTML = '';
+                    listaFutura.slice(0, 8).forEach(v => {
+                        tbody.innerHTML += `<tr><td>${v.chegada}</td><td>${v.saida}</td><td>${v.motorista}</td><td>${v.destino}</td><td>${v.plataforma}</td></tr>`;
+                    });
+
+                    // Atualizar o grupo do Carousel
+                    if (listaFutura.length > 0) {
+                        const minTempo = listaFutura[0].min;
+                        grupoDestaque = listaFutura.filter(v => v.min === minTempo);
+                    } else {
+                        document.getElementById('info-destaque').innerHTML = "Não há mais partidas hoje.";
+                        grupoDestaque = [];
+                    }
+                } catch(e) { console.error("Erro dados:", e); }
+            }
+
+            // 3. Carregar Mensagens
+            async function carregarMensagens() {
+                try {
+                    const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
+                    const textCfg = await respCfg.text();
+                    listaMensagens = textCfg.split('\n').filter(l => l.trim() !== "");
+                } catch(e) { console.error("Erro config:", e); }
+            }
+
+            // 4. Loops de Exibição
+            // Carousel de Mensagens
+            setInterval(() => {
+                if (listaMensagens.length > 1) {
+                    const cfg = listaMensagens[(msgIndex % (listaMensagens.length - 1)) + 1].split(',');
+                    const el = document.getElementById('box-informativo');
+                    el.style.opacity = 0;
+                    setTimeout(() => {
+                        el.innerText = cfg[0];
+                        el.style.opacity = 1;
+                        msgIndex++;
+                    }, 500);
+                }
+            }, 5000);
+
+            // Carousel de Destaque
+            setInterval(() => {
+                if (grupoDestaque.length > 0) {
+                    const el = document.getElementById('box-partida');
+                    const info = document.getElementById('info-destaque');
+                    el.style.opacity = 0;
+                    setTimeout(() => {
+                        const v = grupoDestaque[carouselIndex % grupoDestaque.length];
+                        info.innerHTML = `${v.destino} - ${v.saida}<br><span style="font-size: 1.8vw;">Motorista: ${v.motorista}, Plat: ${v.plataforma}</span>`;
+                        el.style.opacity = 1;
+                        carouselIndex++;
+                    }, 500);
+                }
+            }, 8000);
+
+            // 5. Início Sincronizado
+            function iniciar() {
+                carregarDados();
+                carregarMensagens();
+                setInterval(carregarDados, 30000);
+                setInterval(carregarMensagens, 60000);
+            }
+            iniciar();
+        });
+    </script>
+</body>
+</html>
