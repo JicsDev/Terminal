@@ -20,12 +20,23 @@
         td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
         #box-informativo { font-weight: bold; text-align: center; color: var(--amarelo-destaque); }
+        .foto-terminal {
+    width: 90%;           /* Ocupa 90% da largura da tela */
+    max-width: 300px;     /* Não deixa passar de um tamanho razoável */
+    border-radius: 15px;  /* Deixa os cantos arredondados */
+    margin: 15px auto;    /* Centraliza a imagem */
+    display: block;
+    border: 3px solid var(--amarelo-destaque); /* Uma bordinha pra dar destaque */
+}
     </style>
 </head>
 <body>
 
     <div id="tela-fechado">
-        <h2>Terminal Fechado</h2>
+        <h2>Terminal Fechado</h2>  
+        
+       <img src="terminal.jpg" alt="Foto do Terminal" class="foto-terminal"> 
+        
         <p id="msg-fechado"></p>
     </div>
 
