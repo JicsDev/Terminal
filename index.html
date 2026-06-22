@@ -58,20 +58,22 @@
         const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
         const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
 
-        let carouselIndex = 0;
         let grupoDestaque = [];
+        let carouselIndex = 0;
+        let listaMensagens = [];
+        let msgIndex = 0;
 
         document.addEventListener("DOMContentLoaded", function() {
-            // Relógio e Data
+            // 1. Relógio e Data (Fixo)
             setInterval(() => {
                 const agora = new Date();
                 document.getElementById('relogio').innerText = agora.toLocaleTimeString();
                 document.getElementById('data-atual').innerText = agora.toLocaleDateString();
             }, 1000);
 
-            async function carregarTudo() {
+            // 2. Carregar Dados de Ônibus
+            async function carregarDados() {
                 try {
-                    // 1. CARREGAR DADOS DAS VANS
                     const resp = await fetch(`${linkDados}&t=${Date.now()}`);
                     const text = await resp.text();
                     const linhas = text.split('\n').filter(l => l.trim() !== "");
@@ -83,7 +85,7 @@
                     for (let i = 1; i < linhas.length; i++) {
                         const cols = linhas[i].split(',');
                         if (cols.length < 5) continue;
-                        const [h, m] = cols[1].trim().split(':'); // Saída
+                        const [h, m] = cols[1].trim().split(':');
                         const minutosSaida = parseInt(h) * 60 + parseInt(m);
                         
                         if (minutosSaida >= minutosAtuais) {
@@ -98,50 +100,42 @@
                         tbody.innerHTML += `<tr><td>${v.chegada}</td><td>${v.saida}</td><td>${v.motorista}</td><td>${v.destino}</td><td>${v.plataforma}</td></tr>`;
                     });
 
-                    // Destaque
-                    const infoDestaque = document.getElementById('info-destaque');
+                    // Atualizar o grupo do Carousel
                     if (listaFutura.length > 0) {
                         const minTempo = listaFutura[0].min;
                         grupoDestaque = listaFutura.filter(v => v.min === minTempo);
                     } else {
-                        infoDestaque.innerHTML = "Não há mais partidas hoje.";
+                        document.getElementById('info-destaque').innerHTML = "Não há mais partidas hoje.";
                         grupoDestaque = [];
                     }
+                } catch(e) { console.error("Erro dados:", e); }
+            }
 
-                    // 2. CARREGAR CONFIG (MENSAGENS)
+            // 3. Carregar Mensagens
+            async function carregarMensagens() {
+                try {
                     const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
                     const textCfg = await respCfg.text();
-                    const linhasCfg = textCfg.split('\n').filter(l => l.trim() !== "");
-                    
-                    if (linhasCfg.length > 1) {
-                        let msgIndex = 0;
-                        function rodarMensagens() {
-                            const cfg = linhasCfg[(msgIndex % (linhasCfg.length - 1)) + 1].split(',');
-                            const el = document.getElementById('box-informativo');
-                            if(el) {
-                                el.style.opacity = 0;
-                                setTimeout(() => {
-                                    el.innerText = cfg[0];
-                                    el.style.opacity = 1;
-                                    msgIndex++;
-                                    setTimeout(rodarMensagens, parseInt(cfg[1]) || 5000);
-                                }, 500);
-                            }
-                        }
-                        // Removemos o rodarMensagens daqui para não duplicar, chamamos apenas uma vez no load
-                    }
-                } catch(e) { console.error("Erro:", e); }
+                    listaMensagens = textCfg.split('\n').filter(l => l.trim() !== "");
+                } catch(e) { console.error("Erro config:", e); }
             }
 
-            // Iniciar tudo sincronizado
-            function iniciarSincronizado() {
-                carregarTudo();
-                const agora = new Date();
-                const delay = 30000 - (agora.getSeconds() * 1000 + agora.getMilliseconds()) % 30000;
-                setTimeout(() => { carregarTudo(); setInterval(carregarTudo, 30000); }, delay);
-            }
-            
-            // Inicia Destaque carousel
+            // 4. Loops de Exibição
+            // Carousel de Mensagens
+            setInterval(() => {
+                if (listaMensagens.length > 1) {
+                    const cfg = listaMensagens[(msgIndex % (listaMensagens.length - 1)) + 1].split(',');
+                    const el = document.getElementById('box-informativo');
+                    el.style.opacity = 0;
+                    setTimeout(() => {
+                        el.innerText = cfg[0];
+                        el.style.opacity = 1;
+                        msgIndex++;
+                    }, 500);
+                }
+            }, 5000);
+
+            // Carousel de Destaque
             setInterval(() => {
                 if (grupoDestaque.length > 0) {
                     const el = document.getElementById('box-partida');
@@ -156,7 +150,14 @@
                 }
             }, 10000);
 
-            iniciarSincronizado();
+            // 5. Início Sincronizado
+            function iniciar() {
+                carregarDados();
+                carregarMensagens();
+                setInterval(carregarDados, 30000);
+                setInterval(carregarMensagens, 60000);
+            }
+            iniciar();
         });
     </script>
 </body>
