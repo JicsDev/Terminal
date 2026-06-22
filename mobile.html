@@ -2,92 +2,125 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Painel Celular - STTRANS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STTRANS Mobile</title>
     <style>
         :root { --verde-sttrans: #009639; --amarelo-destaque: #FFD700; --branco: #FFFFFF; }
         body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; padding: 10px; }
         
-        header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid var(--amarelo-destaque); padding-bottom: 10px; }
-        h1 { font-size: 1.2rem; margin: 5px 0; }
+        /* Telas */
+        #tela-fechado { display: none; text-align: center; padding-top: 50px; }
+        #conteudo-principal { display: block; }
         
-        /* Blocos empilhados */
         .bloco { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        h2 { color: var(--amarelo-destaque); }
         
-        /* Destaque */
-        #info-destaque { font-size: 1.3rem; font-weight: bold; color: var(--branco); }
-        
-        /* Tabela Otimizada */
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         th { color: var(--amarelo-destaque); text-align: left; padding: 5px; border-bottom: 1px solid var(--branco); }
         td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
-        /* Mensagens */
-        #box-informativo { font-size: 1rem; font-weight: bold; text-align: center; color: var(--amarelo-destaque); min-height: 50px; }
+        #box-informativo { font-weight: bold; text-align: center; color: var(--amarelo-destaque); }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>STTRANS <br> Terminal de Transporte Alternativo </h1>
-    </header>
-
-    <div class="bloco" id="box-partida">
-        <strong>Próxima Partida:</strong>
-        <div id="info-destaque">Carregando...</div>
+    <div id="tela-fechado">
+        <h2>Terminal Fechado</h2>
+        <p id="msg-fechado"></p>
     </div>
 
-    <div class="bloco" id="lista-proximos">
-        <table>
-            <thead><tr><th>Chegada</th><th>Saída</th><th>Motorista</th><th>Destino</th></tr></thead>
-            <tbody id="corpo-tabela"></tbody>
-        </table>
+    <div id="conteudo-principal">
+        <div class="bloco">
+            <strong>Próxima Partida:</strong><br>
+            <span id="info-destaque">Carregando...</span>
+        </div>
+        <div class="bloco">
+            <table>
+                <thead><tr><th>Saída</th><th>Motorista</th><th>Destino</th></tr></thead>
+                <tbody id="corpo-tabela"></tbody>
+            </table>
+        </div>
+        <div class="bloco" id="box-informativo">Carregando avisos...</div>
     </div>
-
-    <div class="bloco" id="box-informativo">Aguardando...</div>
 
     <script>
         const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
         const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
 
-        async function carregarTudo() {
+        let mensagens = [];
+        let msgIndex = 0;
+
+        async function iniciarSistema() {
             try {
-                // Carrega Dados
-                const resp = await fetch(`${linkDados}&t=${Date.now()}`);
-                const text = await resp.text();
-                const linhas = text.split('\n').filter(l => l.trim() !== "");
-                
-                const agora = new Date();
-                const minAtuais = agora.getHours() * 60 + agora.getMinutes();
-                const tbody = document.getElementById('corpo-tabela');
-                tbody.innerHTML = '';
-                
-                let achou = false;
-                for (let i = 1; i < linhas.length; i++) {
-                    const cols = linhas[i].split(',');
-                    const [h, m] = cols[1].trim().split(':');
-                    if (parseInt(h) * 60 + parseInt(m) >= minAtuais) {
-                        // Tabela SEM PLATAFORMA (cols 0, 1, 4, 2)
-                        tbody.innerHTML += `<tr><td>${cols[0]}</td><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td></tr>`;
-                        if (!achou) {
-                            document.getElementById('info-destaque').innerHTML = `${cols[2]}<br>${cols[1]} - Motorista: ${cols[4]}`;
-                            achou = true;
-                        }
-                    }
-                }
-                
-                // Carrega Mensagens
+                // 1. CHECAR HORÁRIO
                 const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
                 const textCfg = await respCfg.text();
-                const linhasCfg = textCfg.split('\n').filter(l => l.trim() !== "");
-                if (linhasCfg.length > 1) {
-                    document.getElementById('box-informativo').innerText = linhasCfg[1].split(',')[0];
+                const linhas = textCfg.split('\n').filter(l => l.trim() !== "");
+                
+                const agora = new Date();
+                const diaSemana = agora.getDay();
+                const minAgora = agora.getHours() * 60 + agora.getMinutes();
+                
+                let estaAberto = false;
+                let msgFechado = "Terminal Fechado.";
+
+                linhas.forEach(linha => {
+                    const [tipo, val1, val2] = linha.split(',');
+                    if (tipo === 'MsgFechado') msgFechado = val1;
+                    if (tipo === 'Horario') {
+                        const [inicio, fim] = val2.split(':'); // val2 é "07:00,17:00" -> "07:00" e "17:00"
+                        const [hA, mA] = inicio.split(':');
+                        const [hF, mF] = fim.split(':');
+                        const minAbre = parseInt(hA)*60 + parseInt(mA);
+                        const minFecha = parseInt(hF)*60 + parseInt(mF);
+                        
+                        if ((val1 === 'SegSex' && diaSemana >= 1 && diaSemana <= 5) || (val1 === 'Sab' && diaSemana === 6)) {
+                            if (minAgora >= minAbre && minAgora <= minFecha) estaAberto = true;
+                        }
+                    } else if (tipo !== 'Horario' && tipo !== 'MsgFechado') {
+                        mensagens.push(linha.split(',')[0]);
+                    }
+                });
+
+                if (!estaAberto) {
+                    document.getElementById('conteudo-principal').style.display = 'none';
+                    document.getElementById('tela-fechado').style.display = 'block';
+                    document.getElementById('msg-fechado').innerText = msgFechado;
+                } else {
+                    carregarDados();
+                    rodarMensagens();
                 }
             } catch(e) { console.error(e); }
         }
 
-        carregarTudo();
-        setInterval(carregarTudo, 30000);
+        async function carregarDados() {
+            const resp = await fetch(`${linkDados}&t=${Date.now()}`);
+            const text = await resp.text();
+            const linhas = text.split('\n').filter(l => l.trim() !== "");
+            const tbody = document.getElementById('corpo-tabela');
+            const agora = new Date();
+            const minAgora = agora.getHours() * 60 + agora.getMinutes();
+            
+            for (let i = 1; i < linhas.length; i++) {
+                const cols = linhas[i].split(',');
+                const [h, m] = cols[1].trim().split(':');
+                if (parseInt(h)*60 + parseInt(m) >= minAgora) {
+                    tbody.innerHTML += `<tr><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td></tr>`;
+                    if (i === 1) document.getElementById('info-destaque').innerText = `${cols[2]} - ${cols[1]}`;
+                }
+            }
+        }
+
+        function rodarMensagens() {
+            if (mensagens.length > 0) {
+                document.getElementById('box-informativo').innerText = mensagens[msgIndex % mensagens.length];
+                msgIndex++;
+                setTimeout(rodarMensagens, 5000);
+            }
+        }
+
+        iniciarSistema();
+        setInterval(iniciarSistema, 30000);
     </script>
 </body>
 </html>
