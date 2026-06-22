@@ -22,6 +22,29 @@
         table { width: 100%; border-collapse: collapse; font-size: 1.3vw; }
         th { text-align: left; color: var(--amarelo-destaque); padding: 10px; border-bottom: 2px solid var(--branco); }
         td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        /* Ajustes para Celulares (Telas estreitas) */
+@media (max-width: 600px) {
+    .container {
+        grid-template-columns: 1fr !important; /* Empilha o Destaque e a Tabela */
+        height: auto !important;
+        padding: 10px !important;
+    }
+    
+    header { padding: 5px 10px !important; }
+    h1 { font-size: 4vw !important; }
+    #relogio { font-size: 6vw !important; }
+    #data-atual { font-size: 3vw !important; }
+    
+    /* Ajusta o texto do destaque para não estourar a tela */
+    #info-destaque { font-size: 6vw !important; line-height: 1.2; }
+    
+    /* Tabela fica mais compacta */
+    table { font-size: 3.5vw !important; }
+    td, th { padding: 5px !important; }
+    
+    .logo { height: 40px !important; }
+}
+
     </style>
 </head>
 <body>
