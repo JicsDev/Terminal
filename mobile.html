@@ -85,7 +85,7 @@
                 if (!estaAberto) {
                     document.getElementById('conteudo-principal').style.display = 'none';
                     document.getElementById('tela-fechado').style.display = 'block';
-                    document.getElementById('msg-fechado').innerText = msgFechado;
+                    document.getElementById('msg-fechado').innerHTML = msgFechado;
                 } else {
                     carregarDados();
                     rodarMensagens();
