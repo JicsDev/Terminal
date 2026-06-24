@@ -8,7 +8,6 @@
         :root { --verde-sttrans: #009639; --amarelo-destaque: #FFD700; --branco: #FFFFFF; }
         body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; padding: 10px; }
         
-        /* Telas */
         #tela-fechado { display: none; text-align: center; padding-top: 50px; }
         #conteudo-principal { display: block; }
         
@@ -18,25 +17,13 @@
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         th { color: var(--amarelo-destaque); text-align: left; padding: 5px; border-bottom: 1px solid var(--branco); }
         td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        
         #box-informativo { font-weight: bold; text-align: center; color: var(--amarelo-destaque); }
-        .foto-terminal {
-    width: 90%;           /* Ocupa 90% da largura da tela */
-    max-width: 300px;     /* Não deixa passar de um tamanho razoável */
-    border-radius: 15px;  /* Deixa os cantos arredondados */
-    margin: 15px auto;    /* Centraliza a imagem */
-    display: block;
-    border: 3px solid var(--amarelo-destaque); /* Uma bordinha pra dar destaque */
-}
     </style>
 </head>
 <body>
 
     <div id="tela-fechado">
-        <h2>Terminal Fechado</h2>  
-        
-       <img src="terminal.jpg" alt="Foto do Terminal" class="foto-terminal"> 
-        
+        <h2>Terminal Fechado</h2>
         <p id="msg-fechado"></p>
     </div>
 
@@ -58,10 +45,15 @@
         const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
         const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
 
-        let mensagens = [];
-        let msgIndex = 0;
+        // Função "Blindada" para transformar "07:00" em minutos (ex: 420)
+        function converterParaMinutos(timeStr) {
+            if (!timeStr) return 0;
+            const limpo = timeStr.trim().replace(/[^\d:]/g, '');
+            const [h, m] = limpo.split(':');
+            return (parseInt(h, 10) * 60) + parseInt(m, 10);
+        }
 
-                async function iniciarSistema() {
+        async function iniciarSistema() {
             try {
                 const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
                 const textCfg = await respCfg.text();
@@ -74,44 +66,36 @@
                 let estaAberto = false;
                 let msgFechado = "Terminal Fechado.";
 
-                console.log("Hoje é dia:", diaSemana, "e o horário é:", minAgora);
-
                 linhas.forEach(linha => {
-                    const colunas = linha.split(',');
-                    if (colunas.length < 2) return;
-                    
-                    const tipo = colunas[0].trim();
-                    const val1 = colunas[1] ? colunas[1].trim() : "";
-                    
-                    // Lógica para MsgFechado
+                    const cols = linha.split(',');
+                    if (cols.length < 2) return;
+
+                    const tipo = cols[0].trim();
+                    const val1 = cols[1] ? cols[1].trim() : "";
+                    const val2 = cols[2] ? cols[2].trim() : "";
+
                     if (tipo === 'MsgFechado') {
                         msgFechado = val1;
                     }
-                    
-                    // Lógica para Horário (Pega o resto da linha e tenta achar horários)
+
                     if (tipo === 'Horario') {
-                        // Junta as colunas 2 e 3 para garantir que pega os horários
-                        const textoHorario = colunas.slice(2).join(',').replace(/\s/g, ''); 
-                        const partes = textoHorario.split(',');
-                        
+                        const partes = val2.split(','); // "07:00,17:00"
                         if (partes.length >= 2) {
-                            const [hA, mA] = partes[0].split(':');
-                            const [hF, mF] = partes[1].split(':');
-                            
-                            const minAbre = parseInt(hA)*60 + parseInt(mA);
-                            const minFecha = parseInt(hF)*60 + parseInt(mF);
-                            
-                            console.log("Validando:", val1, "Abre:", minAbre, "Fecha:", minFecha);
-                            
+                            const minAbre = converterParaMinutos(partes[0]);
+                            const minFecha = converterParaMinutos(partes[1]);
+
+                            console.log("Checando:", val1, "Abre:", minAbre, "Fecha:", minFecha, "Agora:", minAgora);
+
                             if ((val1 === 'SegSex' && diaSemana >= 1 && diaSemana <= 5) || (val1 === 'Sab' && diaSemana === 6)) {
-                                if (minAgora >= minAbre && minAgora <= minFecha) estaAberto = true;
+                                if (minAgora >= minAbre && minAgora <= minFecha) {
+                                    estaAberto = true;
+                                }
                             }
                         }
                     }
                 });
 
                 if (!estaAberto) {
-                    console.log("Lógica final: Terminal Fechado.");
                     document.getElementById('conteudo-principal').style.display = 'none';
                     document.getElementById('tela-fechado').style.display = 'block';
                     document.getElementById('msg-fechado').innerHTML = msgFechado;
@@ -120,37 +104,38 @@
                     document.getElementById('tela-fechado').style.display = 'none';
                     carregarDados();
                 }
-            } catch(e) { console.error("Erro no sistema:", e); }
-        }
-        
-        async function carregarDados() {
-            const resp = await fetch(`${linkDados}&t=${Date.now()}`);
-            const text = await resp.text();
-            const linhas = text.split('\n').filter(l => l.trim() !== "");
-            const tbody = document.getElementById('corpo-tabela');
-            const agora = new Date();
-            const minAgora = agora.getHours() * 60 + agora.getMinutes();
-            
-            for (let i = 1; i < linhas.length; i++) {
-                const cols = linhas[i].split(',');
-                const [h, m] = cols[1].trim().split(':');
-                if (parseInt(h)*60 + parseInt(m) >= minAgora) {
-                    tbody.innerHTML += `<tr><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td></tr>`;
-                    if (i === 1) document.getElementById('info-destaque').innerText = `${cols[2]} - ${cols[1]}`;
-                }
-            }
+            } catch(e) { console.error("Erro:", e); }
         }
 
-        function rodarMensagens() {
-            if (mensagens.length > 0) {
-                document.getElementById('box-informativo').innerText = mensagens[msgIndex % mensagens.length];
-                msgIndex++;
-                setTimeout(rodarMensagens, 5000);
-            }
+        async function carregarDados() {
+            try {
+                const resp = await fetch(`${linkDados}&t=${Date.now()}`);
+                const text = await resp.text();
+                const linhas = text.split('\n').filter(l => l.trim() !== "");
+                const tbody = document.getElementById('corpo-tabela');
+                tbody.innerHTML = '';
+                
+                const agora = new Date();
+                const minAgora = agora.getHours() * 60 + agora.getMinutes();
+                
+                let achou = false;
+                for (let i = 1; i < linhas.length; i++) {
+                    const cols = linhas[i].split(',');
+                    const minSaida = converterParaMinutos(cols[1]);
+
+                    if (minSaida >= minAgora) {
+                        tbody.innerHTML += `<tr><td>${cols[1]}</td><td>${cols[4]}</td><td>${cols[2]}</td></tr>`;
+                        if (!achou) {
+                            document.getElementById('info-destaque').innerText = `${cols[2]} - ${cols[1]}`;
+                            achou = true;
+                        }
+                    }
+                }
+            } catch(e) { console.error(e); }
         }
 
         iniciarSistema();
-        setInterval(iniciarSistema, 30000);
+        setInterval(iniciarSistema, 60000);
     </script>
 </body>
 </html>
