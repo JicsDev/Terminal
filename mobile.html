@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>STTRANS Mobile</title>
+    <title>Painel Celular - STTRANS</title>
     <style>
         :root { --verde-sttrans: #009639; --amarelo-destaque: #FFD700; --branco: #FFFFFF; }
         body { background-color: var(--verde-sttrans); color: var(--branco); font-family: sans-serif; margin: 0; padding: 10px; }
@@ -11,14 +11,18 @@
         header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid var(--amarelo-destaque); padding-bottom: 10px; }
         h1 { font-size: 1.2rem; margin: 5px 0; }
         
+        /* Blocos empilhados */
         .bloco { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
         
+        /* Destaque */
         #info-destaque { font-size: 1.3rem; font-weight: bold; color: var(--branco); }
         
+        /* Tabela Otimizada */
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th { color: var(--amarelo-destaque); text-align: left; padding: 5px; border-bottom: 1px solid var(--branco); }
         td { padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
+        /* Mensagens */
         #box-informativo { font-size: 1rem; font-weight: bold; text-align: center; color: var(--amarelo-destaque); min-height: 50px; }
     </style>
 </head>
@@ -40,14 +44,11 @@
         </table>
     </div>
 
-    <div class="bloco" id="box-informativo">Carregando...</div>
+    <div class="bloco" id="box-informativo">Aguardando...</div>
 
     <script>
         const linkDados = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=0&single=true&output=csv';
         const linkConfig = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRucRudwW4SYG4nzihkR7xcAUAxxXFjO9KKsnxA2NTW6b-t10sz6RZrvcgx8AsjPEl6fJW9iiznYo26/pub?gid=1303599216&single=true&output=csv';
-
-        let mensagens = [];
-        let msgIndex = 0;
 
         async function carregarTudo() {
             try {
@@ -79,22 +80,14 @@
                 const respCfg = await fetch(`${linkConfig}&t=${Date.now()}`);
                 const textCfg = await respCfg.text();
                 const linhasCfg = textCfg.split('\n').filter(l => l.trim() !== "");
-                mensagens = linhasCfg.map(l => l.split(',')[0]);
-                
+                if (linhasCfg.length > 1) {
+                    document.getElementById('box-informativo').innerText = linhasCfg[1].split(',')[0];
+                }
             } catch(e) { console.error(e); }
-        }
-
-        function rodarMensagens() {
-            if (mensagens.length > 0) {
-                document.getElementById('box-informativo').innerText = mensagens[msgIndex % mensagens.length];
-                msgIndex++;
-            }
-            setTimeout(rodarMensagens, 5000);
         }
 
         carregarTudo();
         setInterval(carregarTudo, 30000);
-        rodarMensagens();
     </script>
 </body>
 </html>
