@@ -77,32 +77,33 @@
 
                 linhas.forEach(linha => {
                     const colunas = linha.split(',');
-                    const tipo = colunas[0];
-                    const val1 = colunas[1];
-                    const val2 = colunas[2];
+                    // Verifica se a linha tem o mínimo de dados necessários para não quebrar
+                    if (colunas.length < 2) return; 
 
-                    if (tipo === 'MsgFechado') msgFechado = val1;
+                    const tipo = colunas[0].trim(); // trim() remove espaços extras
+                    
+                    if (tipo === 'MsgFechado') {
+                        msgFechado = colunas[1] || "Terminal Fechado";
+                    }
                     
                     if (tipo === 'Horario') {
-                        // AQUI ESTÁ A CORREÇÃO:
-                        const partesHorario = val2.split(','); // Divide "07:00,17:00" em ["07:00", "17:00"]
-                        const [hA, mA] = partesHorario[0].split(':'); // Pega as horas e min de abertura
-                        const [hF, mF] = partesHorario[1].split(':'); // Pega as horas e min de fechamento
-                        
-                        const minAbre = parseInt(hA)*60 + parseInt(mA);
-                        const minFecha = parseInt(hF)*60 + parseInt(mF);
-                        
-                        // Debug (se quiser ver no console do navegador)
-                        console.log(`Verificando dia ${diaSemana}: atual=${minAgora}, abre=${minAbre}, fecha=${minFecha}`);
-                        
-                        if ((val1 === 'SegSex' && diaSemana >= 1 && diaSemana <= 5) || (val1 === 'Sab' && diaSemana === 6)) {
-                            if (minAgora >= minAbre && minAgora <= minFecha) estaAberto = true;
+                        // Verifica se existe a terceira coluna antes de tentar dividir
+                        if (colunas[2]) {
+                            const partesHorario = colunas[2].split(',');
+                            if (partesHorario.length >= 2) {
+                                const [hA, mA] = partesHorario[0].split(':');
+                                const [hF, mF] = partesHorario[1].split(':');
+                                const minAbre = parseInt(hA)*60 + parseInt(mA);
+                                const minFecha = parseInt(hF)*60 + parseInt(mF);
+                                
+                                if ((colunas[1].trim() === 'SegSex' && diaSemana >= 1 && diaSemana <= 5) || (colunas[1].trim() === 'Sab' && diaSemana === 6)) {
+                                    if (minAgora >= minAbre && minAgora <= minFecha) estaAberto = true;
+                                }
+                            }
                         }
-                    } else if (tipo !== 'Horario' && tipo !== 'MsgFechado') {
-                        mensagens.push(colunas[0]);
                     }
-                });      
-
+                });
+                
                 if (!estaAberto) {
                     document.getElementById('conteudo-principal').style.display = 'none';
                     document.getElementById('tela-fechado').style.display = 'block';
