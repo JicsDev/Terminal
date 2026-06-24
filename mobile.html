@@ -82,28 +82,29 @@
                     
                     const tipo = colunas[0].trim();
                     const val1 = colunas[1] ? colunas[1].trim() : "";
-                    const val2 = colunas[2] ? colunas[2].trim() : "";
-
+                    
+                    // Lógica para MsgFechado
                     if (tipo === 'MsgFechado') {
                         msgFechado = val1;
                     }
                     
+                    // Lógica para Horário (Pega o resto da linha e tenta achar horários)
                     if (tipo === 'Horario') {
-                        const partesHorario = val2.split(',');
-                        if (partesHorario.length >= 2) {
-                            const [hA, mA] = partesHorario[0].split(':');
-                            const [hF, mF] = partesHorario[1].split(':');
+                        // Junta as colunas 2 e 3 para garantir que pega os horários
+                        const textoHorario = colunas.slice(2).join(',').replace(/\s/g, ''); 
+                        const partes = textoHorario.split(',');
+                        
+                        if (partes.length >= 2) {
+                            const [hA, mA] = partes[0].split(':');
+                            const [hF, mF] = partes[1].split(':');
+                            
                             const minAbre = parseInt(hA)*60 + parseInt(mA);
                             const minFecha = parseInt(hF)*60 + parseInt(mF);
                             
-                            // Debug: Ver o que ele está comparando
-                            console.log("Verificando linha Horario:", val1, "Abre:", minAbre, "Fecha:", minFecha);
+                            console.log("Validando:", val1, "Abre:", minAbre, "Fecha:", minFecha);
                             
                             if ((val1 === 'SegSex' && diaSemana >= 1 && diaSemana <= 5) || (val1 === 'Sab' && diaSemana === 6)) {
-                                if (minAgora >= minAbre && minAgora <= minFecha) {
-                                    estaAberto = true;
-                                    console.log("CONDIÇÃO ATINGIDA: Terminal Aberto!");
-                                }
+                                if (minAgora >= minAbre && minAgora <= minFecha) estaAberto = true;
                             }
                         }
                     }
